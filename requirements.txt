@@ -4,4 +4,5 @@ flask-sqlalchemy==3.1.1
 sqlalchemy==2.0.41
 python-dotenv==0.19.0
 psycopg2-binary==2.9.9
+numpy
 gunicorn
