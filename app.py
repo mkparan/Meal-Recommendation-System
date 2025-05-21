@@ -1,74 +1,56 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request
 from flask_sqlalchemy import SQLAlchemy
-from config import Config
+from model import get_recommendations
+import os
 import json
-import model
-import tensorflow as tf
-import numpy as np
 
 app = Flask(__name__)
-app.config.from_object(Config)
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DATABASE_URL", "postgresql://localhost/meal_recommender")
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-# Database Model - MUST match your actual table structure
 class Recommendation(db.Model):
-    __tablename__ = 'recommendation'
     id = db.Column(db.Integer, primary_key=True)
     calories = db.Column(db.Float)
     protein = db.Column(db.Float)
     carbs = db.Column(db.Float)
     fat = db.Column(db.Float)
-    ingredients = db.Column(db.String(500))
-    recommendations = db.Column(db.JSON)  # Changed to JSON type
-
-# Create tables
-with app.app_context():
-    db.create_all()
+    ingredients = db.Column(db.Text)
+    recommendations = db.Column(db.JSON)
 
 @app.route('/')
-def home():
+def index():
     return render_template('index.html')
 
 @app.route('/recommend', methods=['POST'])
 def recommend():
     try:
-        data = request.json
-        
-        calories = float(data['calories'])
-        protein = float(data['protein'])
-        carbs = float(data['carbs'])
-        fat = float(data['fat'])
-        ingredients = data['ingredients']
+        calories = float(request.form['calories'])
+        protein = float(request.form['protein'])
+        carbs = float(request.form['carbs'])
+        fat = float(request.form['fat'])
+        ingredients = request.form.get('ingredients', '').split(',')
 
-        print(f"Input received: {calories=}, {protein=}, {carbs=}, {fat=}, {ingredients=}")
+        # Clean ingredients list
+        ingredients = [i.strip() for i in ingredients if i.strip()]
 
-        recommendations = model.get_recommendations(
+        recommended_meals = get_recommendations(calories, protein, carbs, fat, ingredients)
+
+        new_record = Recommendation(
             calories=calories,
             protein=protein,
             carbs=carbs,
             fat=fat,
-            ingredients=ingredients
+            ingredients=json.dumps(ingredients),
+            recommendations=recommended_meals
         )
-
-        print(f"Recommendations: {recommendations}")
-
-        rec = Recommendation(
-            calories=calories,
-            protein=protein,
-            carbs=carbs,
-            fat=fat,
-            ingredients=str(ingredients),
-            recommendations=recommendations
-        )
-        db.session.add(rec)
+        db.session.add(new_record)
         db.session.commit()
 
-        return jsonify(recommendations)
+        return render_template('index.html', recommendations=recommended_meals)
 
     except Exception as e:
-        print("ERROR:", str(e))  # <-- Show error in console
-        return jsonify({"error": str(e)}), 500
-
+        return f"Error occurred: {str(e)}", 500
 
 if __name__ == '__main__':
     app.run(debug=True)
