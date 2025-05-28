@@ -75,12 +75,15 @@ def get_recommendations(calories, protein, carbs, fat, ingredients):
         top_indices = predictions.argsort()[::-1]
 
         for idx in top_indices:
-            recipe = recipes[idx]
-            if recipe in matched:
-                continue
-            if matches_ingredients(recipe["ingredients"], ingredients):
-                matched.append(recipe)
-            if len(matched) == 3:
-                break
+           if idx >= len(recipes):
+               continue  # safely skip out-of-range indices
+           recipe = recipes[idx]
+           if recipe in matched:
+               continue
+           if matches_ingredients(recipe["ingredients"], ingredients):
+               matched.append(recipe)
+           if len(matched) == 3:
+               break
+
 
     return matched
